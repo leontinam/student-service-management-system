@@ -1,5 +1,37 @@
 function initialisePageControls() {
 
+    function updateNotificationIndicators(count) {
+        const displayCount = count > 99 ? '99+' : String(count);
+        const topNotification = document.querySelector('.app-topbar-action-btn[aria-label="Notifications"]');
+        const sidebarNotification = Array.from(document.querySelectorAll('.app-sidebar a'))
+            .find(function (link) { return link.textContent.trim().startsWith('Notifications'); });
+
+        [topNotification, sidebarNotification].forEach(function (notificationLink) {
+            if (!notificationLink) return;
+
+            let badge = notificationLink.querySelector('.notification-count, .notification-sidebar-count, .badge');
+            if (count <= 0) {
+                if (badge) badge.remove();
+                return;
+            }
+
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = notificationLink === topNotification ? 'notification-count' : 'badge bg-danger notification-sidebar-count';
+                notificationLink.appendChild(badge);
+            }
+            badge.textContent = displayCount;
+            notificationLink.setAttribute('aria-label', 'Notifications (' + displayCount + ' unread)');
+        });
+    }
+
+    fetch('../api/notification_count.php')
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (data) {
+            if (data && typeof data.count === 'number') updateNotificationIndicators(data.count);
+        })
+        .catch(function () { /* Notification badges remain unchanged if the count cannot be loaded. */ });
+
     const deleteLinks = document.querySelectorAll('.confirm-delete');
     deleteLinks.forEach(function (link) {
         link.addEventListener('click', function (e) {
@@ -35,6 +67,21 @@ function initialisePageControls() {
 
     const profileButton = document.querySelector('.app-profile-btn');
     if (profileButton) {
+        function applyProfilePicture(user) {
+            if (user.profile_picture) {
+                profileButton.innerHTML = `<img src="../${user.profile_picture}" alt="">`;
+            } else {
+                profileButton.classList.add('app-profile-default');
+            }
+        }
+
+        fetch('../profile_data.php')
+            .then(function (response) { return response.ok ? response.json() : null; })
+            .then(function (user) {
+                if (user && !user.error) applyProfilePicture(user);
+            })
+            .catch(function () { /* Keep the initial visible if the profile image cannot be loaded. */ });
+
         profileButton.addEventListener('click', async function () {
             let modal = document.querySelector('.profile-modal-backdrop');
             if (modal) { modal.remove(); return; }
@@ -53,8 +100,7 @@ function initialisePageControls() {
                 details[0].textContent = user.email;
                 details[1].textContent = user.phone_number;
                 modal.querySelector('.profile-modal-role').textContent = (user.role || 'user').replace(/[_-]/g, ' ');
-                if (user.profile_picture) { profileButton.innerHTML = `<img src="../${user.profile_picture}" alt="">`; }
-                else { profileButton.classList.add('app-profile-default'); }
+                applyProfilePicture(user);
                 modal.querySelector('.profile-modal-close').addEventListener('click', () => modal.remove());
                 modal.addEventListener('click', (event) => { if (event.target === modal) modal.remove(); });
                 document.body.appendChild(modal);

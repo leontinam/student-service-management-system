@@ -19,10 +19,11 @@ if (!$serviceId || !$rating || $rating < 1 || $rating > 5) {
     exit();
 }
 
-$service = $conn->prepare("SELECT service_id FROM services WHERE service_id = ? AND status = 'approved' AND availability_status = 'available'");
+$service = $conn->prepare("SELECT service_id, provider_id, title FROM services WHERE service_id = ? AND status = 'approved' AND availability_status = 'available'");
 $service->bind_param('i', $serviceId);
 $service->execute();
-if (!$service->get_result()->fetch_assoc()) {
+$serviceInfo = $service->get_result()->fetch_assoc();
+if (!$serviceInfo) {
     header('Location: browse.php?rating=unavailable');
     exit();
 }
@@ -31,6 +32,24 @@ $studentId = $_SESSION['user_id'];
 $review = $conn->prepare('INSERT INTO reviews (student_id, service_id, rating) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE rating = VALUES(rating), created_at = CURRENT_TIMESTAMP');
 $review->bind_param('iii', $studentId, $serviceId, $rating);
 
-header('Location: browse.php?rating=' . ($review->execute() ? 'saved' : 'error'));
+$saved = $review->execute();
+
+if ($saved) {
+    $studentName = $_SESSION['full_name'] ?? 'A student';
+    $providerMessage = $studentName . ' rated your service "' . $serviceInfo['title'] . '" ' . $rating . '/5.';
+    $providerNotice = $conn->prepare('INSERT INTO notifications (user_id, message) VALUES (?, ?)');
+    $providerNotice->bind_param('is', $serviceInfo['provider_id'], $providerMessage);
+    $providerNotice->execute();
+
+    $adminMessage = $studentName . ' rated the service "' . $serviceInfo['title'] . '" ' . $rating . '/5.';
+    $adminIds = $conn->query("SELECT user_id FROM users WHERE role = 'admin'");
+    $adminNotice = $conn->prepare('INSERT INTO notifications (user_id, message) VALUES (?, ?)');
+    while ($admin = $adminIds->fetch_assoc()) {
+        $adminNotice->bind_param('is', $admin['user_id'], $adminMessage);
+        $adminNotice->execute();
+    }
+}
+
+header('Location: browse.php?rating=' . ($saved ? 'saved' : 'error'));
 exit();
 ?>

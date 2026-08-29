@@ -106,9 +106,8 @@
 
             <div class="provider-services-heading">
                 <div>
-                    <span class="service-form-eyebrow">YOUR CATALOGUE</span>
-                    <h1>Services you manage</h1>
-                    <p>Keep your listings accurate and switch availability whenever you need to.</p>
+                    <h1>My services</h1>
+                    <p>Manage your listings and their availability.</p>
                 </div>
                 <a href="add_service.php" class="btn btn-brand service-add-btn"><span aria-hidden="true">+</span> Add a service</a>
             </div>
@@ -116,8 +115,8 @@
             <?php if ($result->num_rows === 0): ?>
                 <div class="listing-empty provider-services-empty">
                     <span class="listing-empty-icon" aria-hidden="true">+</span>
-                    <h2>Your catalogue is waiting</h2>
-                    <p>Add your first service and let students know how you can help.</p>
+                    <h2>No services yet</h2>
+                    <p>Add your first service to start building your catalogue.</p>
                     <a href="add_service.php" class="btn btn-brand">Create your first service</a>
                 </div>
             <?php else: ?>

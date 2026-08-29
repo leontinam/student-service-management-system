@@ -12,6 +12,8 @@ $stmt = $conn->prepare('SELECT full_name, email, phone_number, profile_picture F
 $stmt->bind_param('i', $userId);
 $stmt->execute();
 $user = $stmt->get_result()->fetch_assoc();
+$message = $_GET['message'] ?? null;
+$error = $_GET['error'] ?? null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['remove_picture'])) {
@@ -46,8 +48,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else $error = 'The picture could not be saved.';
         }
     }
-    $stmt->execute();
-    $user = $stmt->get_result()->fetch_assoc();
+    if (isset($message)) {
+        header('Location: profile.php?message=' . rawurlencode($message));
+        exit();
+    }
+
+    if (isset($error)) {
+        header('Location: profile.php?error=' . rawurlencode($error));
+        exit();
+    }
 }
 ?>
 <!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Edit Profile</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"><link href="assets/css/style.css" rel="stylesheet"></head><body><main class="profile-page"><section class="profile-editor"><h1 class="h4">Edit Profile</h1><?php if (isset($message)): ?><div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div><?php endif; ?><?php if (isset($error)): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?><p class="text-muted mb-4"><?php echo htmlspecialchars($user['full_name']); ?><br><?php echo htmlspecialchars($user['email']); ?><br><?php echo htmlspecialchars($user['phone_number']); ?></p><form method="post" enctype="multipart/form-data"><label class="form-label">Profile picture</label><input class="form-control mb-3" type="file" name="profile_picture" accept="image/jpeg,image/png,image/webp"><button class="btn btn-brand" type="submit">Upload picture</button></form><?php if (!empty($user['profile_picture'])): ?><form method="post" class="mt-3"><button class="btn btn-outline-danger" name="remove_picture" value="1" type="submit">Remove picture</button></form><?php endif; ?><a class="d-block mt-4" href="javascript:history.back()">Back</a></section></main></body></html>

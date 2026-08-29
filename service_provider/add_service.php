@@ -82,26 +82,14 @@
             </div>
         </div>
 
-        <div class="app-content">
+        <div class="app-content service-form-content">
             <div class="service-form-layout">
-                <section class="service-form-intro">
-                    <span class="service-form-eyebrow">SERVICE CATALOGUE</span>
-                    <h1>Share what you can help students with.</h1>
-                    <p>Your service will be sent to the admin team for review before it becomes visible to students.</p>
-                    <div class="service-form-steps" aria-label="Service submission steps">
-                        <div class="service-form-step is-active"><span>1</span><div><strong>Add the details</strong><small>Describe your service clearly</small></div></div>
-                        <div class="service-form-step"><span>2</span><div><strong>Admin review</strong><small>We check it meets the guidelines</small></div></div>
-                        <div class="service-form-step"><span>3</span><div><strong>Go live</strong><small>Students can discover your service</small></div></div>
-                    </div>
-                </section>
-
                 <section class="service-form-panel">
                     <div class="service-form-panel-header">
                         <div class="service-form-icon" aria-hidden="true">+</div>
                         <div>
-                            <span class="service-form-eyebrow">NEW LISTING</span>
-                            <h2>Service details</h2>
-                            <p>Give students a clear picture of what you offer.</p>
+                            <h1>Add a service</h1>
+                            <p>Complete the details below. New services are reviewed before they are published.</p>
                         </div>
                     </div>
 
@@ -112,13 +100,12 @@
                     <form action="add_service.php" method="POST" class="service-submission-form">
                         <div class="service-form-field">
                             <label class="form-label" for="service-title">Service title <span>Required</span></label>
-                            <input id="service-title" type="text" name="title" class="form-control" maxlength="100" placeholder="e.g. CV design and review" required>
-                            <small>A short, specific name makes your listing easier to find.</small>
+                            <input id="service-title" type="text" name="title" class="form-control" maxlength="100" placeholder="e.g. Tutoring, Hair Braiding" required>
                         </div>
                         <div class="service-form-field">
                             <label class="form-label" for="service-category">Category <span>Required</span></label>
                             <select id="service-category" name="category_id" class="form-select" required>
-                                <option value="">Choose the best fit</option>
+                                <option value="">Select category</option>
                                 <?php while ($cat = $categories_result->fetch_assoc()): ?>
                                     <option value="<?php echo $cat['category_id']; ?>">
                                         <?php echo htmlspecialchars($cat['category_name']); ?>
@@ -128,12 +115,11 @@
                         </div>
                         <div class="service-form-field">
                             <label class="form-label" for="service-description">What does this service include? <span>Required</span></label>
-                            <textarea id="service-description" name="description" class="form-control" rows="5" placeholder="Explain what students can expect, who it is for, and how you can help." required></textarea>
-                            <small>Helpful descriptions include the outcome and any important details.</small>
+                            <textarea id="service-description" name="description" class="form-control" rows="5" placeholder="Describe what you offer, how much it costs, and any other important details." required></textarea>
                         </div>
                         <div class="service-form-footer">
-                            <p><span aria-hidden="true">✓</span> Submitted services are reviewed before publishing.</p>
-                            <button type="submit" class="btn btn-brand service-submit-btn">Submit for review <span aria-hidden="true">→</span></button>
+                            <p><span aria-hidden="true">✓</span> Your service will be submitted for review.</p>
+                            <button type="submit" class="btn btn-brand service-submit-btn">Submit service</button>
                         </div>
                     </form>
 
