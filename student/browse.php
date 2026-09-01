@@ -108,9 +108,9 @@
                 </div>
             <?php endif; ?>
 
-            <form action="browse.php" method="GET" class="row g-3 mb-4">
+            <form action="browse.php" method="GET" class="row g-3 mb-4" id="service-filter-form">
                 <div class="col-md-4">
-                    <select name="category_id" class="form-select">
+                    <select name="category_id" class="form-select" onchange="this.form.submit()">
                         <option value="">All Categories</option>
                         <?php 
                             $categories_result->data_seek(0);
@@ -124,22 +124,23 @@
                     </select>
                 </div>
                 <div class="col-md-5">
-                    <input type="text" name="keyword" class="form-control" 
+                    <input type="text" name="keyword" id="keyword-search" class="form-control"
                            placeholder="Search by keyword..." 
                            value="<?php echo htmlspecialchars($keyword); ?>">
                 </div>
                 <div class="col-md-3">
-                    <button type="submit" class="btn btn-brand w-100">Search</button>
+                    <button type="button" id="keyword-search-button" class="btn btn-brand w-100">Search</button>
                 </div>
             </form>
 
-            <?php if ($result->num_rows === 0): ?>
-                <div class="listing-empty">
-                    <span class="listing-empty-icon" aria-hidden="true">⌕</span>
-                    <p>No services found matching your search.</p>
-                </div>
-            <?php else: ?>
-                <div class="listing-grid">
+            <div id="results-container">
+                <?php if ($result->num_rows === 0): ?>
+                    <div class="listing-empty">
+                        <span class="listing-empty-icon" aria-hidden="true">⌕</span>
+                        <p>No services found matching your search.</p>
+                    </div>
+                <?php else: ?>
+                    <div class="listing-grid">
                     <?php while ($service = $result->fetch_assoc()): ?>
                         <article class="listing-card">
                             <div class="listing-card-header">
@@ -175,8 +176,9 @@
                             </form>
                         </article>
                     <?php endwhile; ?>
-                </div>
-            <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
 
         </div>
     </div>
@@ -185,6 +187,97 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../assets/js/script.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('service-filter-form');
+    const input = document.getElementById('keyword-search');
+    const searchButton = document.getElementById('keyword-search-button');
+    const resultsContainer = document.getElementById('results-container');
+    let debounceTimer;
+    let activeRequest;
+
+    const addTextElement = (parent, tagName, className, value) => {
+        const element = document.createElement(tagName);
+        element.className = className;
+        element.textContent = value || 'Not provided';
+        parent.appendChild(element);
+    };
+
+    const renderServices = (services) => {
+        resultsContainer.replaceChildren();
+
+        if (services.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'listing-empty';
+            empty.innerHTML = '<span class="listing-empty-icon" aria-hidden="true">⌕</span><p>No services found matching your search.</p>';
+            resultsContainer.appendChild(empty);
+            return;
+        }
+
+        const grid = document.createElement('div');
+        grid.className = 'listing-grid';
+
+        services.forEach((service) => {
+            const card = document.createElement('article');
+            card.className = 'listing-card';
+
+            const header = document.createElement('div');
+            header.className = 'listing-card-header';
+            addTextElement(header, 'span', 'listing-badge listing-badge-category', service.category_name);
+            card.appendChild(header);
+            addTextElement(card, 'h2', 'listing-title', service.title);
+            addTextElement(card, 'p', 'listing-description', service.description);
+
+            const meta = document.createElement('div');
+            meta.className = 'listing-meta';
+            addTextElement(meta, 'div', 'listing-meta-item', `Provider: ${service.full_name || 'Not provided'}`);
+            addTextElement(meta, 'div', 'listing-meta-item', `Phone: ${service.phone_number || 'Not provided'}`);
+            addTextElement(meta, 'div', 'listing-meta-item', `Email: ${service.email || 'Not provided'}`);
+            card.appendChild(meta);
+            grid.appendChild(card);
+        });
+
+        resultsContainer.appendChild(grid);
+    };
+
+    const searchServices = async () => {
+        if (activeRequest) {
+            activeRequest.abort();
+        }
+
+        activeRequest = new AbortController();
+
+        try {
+            const response = await fetch(`search_api.php?keyword=${encodeURIComponent(input.value)}`, {
+                signal: activeRequest.signal,
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (!response.ok) {
+                throw new Error('Search request failed');
+            }
+
+            const services = await response.json();
+            renderServices(services);
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                resultsContainer.innerHTML = '<div class="listing-empty"><p>Unable to load services. Please try again.</p></div>';
+            }
+        }
+    };
+
+    input.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(searchServices, 300);
+    });
+
+    searchButton.addEventListener('click', searchServices);
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        searchServices();
+    });
+});
+</script>
 
 </body>
 </html>
