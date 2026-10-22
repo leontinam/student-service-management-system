@@ -1,0 +1,16 @@
+# Disable directory listings and deny direct access to environment and internal project files.
+Options -Indexes
+
+<IfModule mod_authz_core.c>
+    <FilesMatch "^\.env(?:\..*)?$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(?:config|database)(?:/|$) - [F,L,NC]
+    RewriteRule (^|/)\.(?!well-known/) - [F,L]
+    RewriteRule \.(?:sql|log|ini)$ - [F,L,NC]
+    RewriteRule ^composer\.(?:json|lock)$ - [F,L,NC]
+</IfModule>

@@ -1,6 +1,7 @@
 <?php
     session_start();
     require '../config/db.php';
+    require_once __DIR__ . '/../config/csrf.php';
 
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'service_provider') {
         header("Location: ../auth/login.php");
@@ -14,17 +15,47 @@
     $notif_count_stmt->execute();
     $notif_count = $notif_count_stmt->get_result()->fetch_assoc()['count'];
 
-    if (isset($_GET['delete'])) {
-        $service_id = $_GET['delete'];
-        $stmt = $conn->prepare("DELETE FROM services WHERE service_id = ? AND provider_id = ?");
-        $stmt->bind_param("ii", $service_id, $provider_id);
-        $stmt->execute();
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['delete', 'toggle'], true)) {
+        if (!csrf_validate_request()) {
+            csrf_reject_request();
+        }
+        $service_id = filter_input(INPUT_POST, 'service_id', FILTER_VALIDATE_INT);
+        if (!$service_id) {
+            header('Location: my_services.php');
+            exit();
+        }
+
+        if ($_POST['action'] === 'delete') {
+        // Verify ownership before removing a provider's service and its dependent favorites.
+        $conn->begin_transaction();
+
+        try {
+            $ownership_stmt = $conn->prepare("SELECT service_id FROM services WHERE service_id = ? AND provider_id = ?");
+            $ownership_stmt->bind_param("ii", $service_id, $provider_id);
+            $ownership_stmt->execute();
+
+            if ($ownership_stmt->get_result()->num_rows === 1) {
+                $favorites_stmt = $conn->prepare("DELETE FROM favorites WHERE service_id = ?");
+                $favorites_stmt->bind_param("i", $service_id);
+                $favorites_stmt->execute();
+
+                $stmt = $conn->prepare("DELETE FROM services WHERE service_id = ? AND provider_id = ?");
+                $stmt->bind_param("ii", $service_id, $provider_id);
+                $stmt->execute();
+            }
+
+            $conn->commit();
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            throw $exception;
+        }
+
         header("Location: my_services.php");
         exit();
-    }
+        }
 
-    if (isset($_GET['toggle'])) {
-        $service_id = $_GET['toggle'];
+        // Availability changes are scoped to this provider and notify students who saved the service.
+        if ($_POST['action'] === 'toggle') {
         $stmt = $conn->prepare("UPDATE services 
                                  SET availability_status = IF(availability_status = 'available', 'unavailable', 'available') 
                                  WHERE service_id = ? AND provider_id = ?");
@@ -51,9 +82,11 @@
 
         header("Location: my_services.php");
         exit();
+        }
     }
 
-    $sql = "SELECT services.*, categories.category_name FROM services INNER JOIN categories ON services.category_id = categories.category_id WHERE services.provider_id = ? ORDER BY services.created_at DESC";
+    // Show only this provider's listings, including requested categories awaiting assignment.
+    $sql = "SELECT services.*, COALESCE(categories.category_name, services.requested_category, 'Category pending') AS category_name FROM services LEFT JOIN categories ON services.category_id = categories.category_id WHERE services.provider_id = ? ORDER BY services.created_at DESC";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $provider_id);
     $stmt->execute();
@@ -85,7 +118,7 @@
         <a href="my_services.php" class="active">My Services</a>
         <a href="notifications.php">Notifications <?php if ($notif_count > 0): ?><span class="badge bg-danger"><?php echo $notif_count; ?></span><?php endif; ?></a>
         <div class="logout-link">
-            <a href="../auth/logout.php">Logout</a>
+            <form action="../auth/logout.php" method="post" class="logout-form"><?php echo csrf_field(); ?><button type="submit" class="logout-form-button">Logout</button></form>
         </div>
     </div>
 
@@ -134,10 +167,8 @@
                             <strong class="provider-review-status provider-review-<?php echo htmlspecialchars($service['status']); ?>"><?php echo ucfirst($service['status']); ?></strong>
                         </div>
                         <div class="listing-actions">
-                            <a href="my_services.php?toggle=<?php echo $service['service_id']; ?>" class="listing-action-btn listing-action-btn-primary">
-                                <?php echo $service['availability_status'] === 'available' ? 'Pause service' : 'Make available'; ?>
-                            </a>
-                            <a href="my_services.php?delete=<?php echo $service['service_id']; ?>" class="listing-action-btn listing-action-btn-danger confirm-delete">Delete</a>
+                            <form method="post" class="d-inline"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="service_id" value="<?php echo (int) $service['service_id']; ?>"><button type="submit" name="action" value="toggle" class="listing-action-btn listing-action-btn-primary"><?php echo $service['availability_status'] === 'available' ? 'Pause service' : 'Make available'; ?></button></form>
+                            <form method="post" class="d-inline confirm-delete-form"><input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8'); ?>"><input type="hidden" name="service_id" value="<?php echo (int) $service['service_id']; ?>"><button type="submit" name="action" value="delete" class="listing-action-btn listing-action-btn-danger confirm-delete">Delete</button></form>
                         </div>
                     </article>
                 <?php endwhile; ?>

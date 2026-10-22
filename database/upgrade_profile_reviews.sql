@@ -1,3 +1,4 @@
+-- Add optional profile image storage and the one-rating-per-student/service review table.
 -- Run once on an existing SSMS database. Skip the first ALTER if profile_picture already exists.
 ALTER TABLE users ADD COLUMN profile_picture VARCHAR(255) DEFAULT NULL AFTER role;
 

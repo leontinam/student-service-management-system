@@ -7,9 +7,18 @@
         exit();
     }
 
-    if (isset($_GET['service_id'])) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        header('Location: browse.php');
+        exit();
+    }
+    if (!csrf_validate_request()) {
+        csrf_reject_request();
+    }
+
+    // INSERT IGNORE avoids creating a duplicate favorite for the same student and service.
+    if (isset($_POST['service_id'])) {
         $student_id = $_SESSION['user_id'];
-        $service_id = $_GET['service_id'];
+        $service_id = filter_input(INPUT_POST, 'service_id', FILTER_VALIDATE_INT);
 
         $sql = "INSERT IGNORE INTO favorites (student_id, service_id) VALUES (?, ?)";
         $stmt = $conn->prepare($sql);

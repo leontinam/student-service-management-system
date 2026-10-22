@@ -1,14 +1,18 @@
 <?php
     session_start();
     require '../config/db.php';
+    require_once __DIR__ . '/../config/csrf.php';
 
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         header("Location: ../auth/login.php");
         exit();
     }
 
-    if (isset($_GET['delete'])) {
-        $user_id = $_GET['delete'];
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_user') {
+        if (!csrf_validate_request()) {
+            csrf_reject_request();
+        }
+        $user_id = filter_input(INPUT_POST, 'user_id', FILTER_VALIDATE_INT);
         if ((int) $user_id !== (int) $_SESSION['user_id']) {
             $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
             $stmt->bind_param("i", $user_id);
@@ -20,6 +24,7 @@
 
     $search = trim($_GET['search'] ?? '');
     $role = $_GET['role'] ?? '';
+    // Build optional search and role filters, binding user-supplied values as parameters.
     $sql = "SELECT * FROM users WHERE 1=1";
     $types = '';
     $params = [];
@@ -59,7 +64,7 @@
         <a href="manage_categories.php">Manage Categories</a>
         <a href="notifications.php">Notifications</a>
         <div class="logout-link">
-            <a href="../auth/logout.php">Logout</a>
+            <form action="../auth/logout.php" method="post" class="logout-form"><?php echo csrf_field(); ?><button type="submit" class="logout-form-button">Logout</button></form>
         </div>
     </div>
 
@@ -79,8 +84,9 @@
         <div class="app-content">
             <div class="admin-toolbar"><div><h1>Users</h1><p>Search and manage registered accounts.</p></div><form method="get" class="d-flex gap-2 admin-search"><input class="form-control" type="search" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Search users"><select class="form-select" name="role"><option value="">All roles</option><option value="student" <?php echo $role === 'student' ? 'selected' : ''; ?>>Students</option><option value="service_provider" <?php echo $role === 'service_provider' ? 'selected' : ''; ?>>Providers</option><option value="admin" <?php echo $role === 'admin' ? 'selected' : ''; ?>>Admins</option></select><button class="btn btn-brand" type="submit">Search</button></form></div>
             <?php if (isset($_GET['message'])): ?><div class="alert alert-success">User removed successfully.</div><?php endif; ?>
-            <div class="admin-panel table-responsive">
-                <table class="table table-hover align-middle admin-table">
+            <div class="admin-panel">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle admin-table">
                     <thead>
                         <tr>
                             <th>Name</th>
@@ -102,14 +108,16 @@
                                 <td><?php echo $user['phone_number']; ?></td>
                                 <td><?php echo $user['created_at']; ?></td>
                                 <td>
-                                    <?php if ((int) $user['user_id'] !== (int) $_SESSION['user_id']): ?><a href="manage_users.php?delete=<?php echo $user['user_id']; ?>" class="listing-action-btn listing-action-btn-danger confirm-delete">
-                                        Delete
-                                    </a><?php else: ?><span class="user-subtext">Current account</span><?php endif; ?>
+                                    <?php if ((int) $user['user_id'] !== (int) $_SESSION['user_id']): ?><form action="manage_users.php" method="post" class="d-inline confirm-delete-form">
+                                        <?php echo csrf_field(); ?><input type="hidden" name="action" value="delete_user"><input type="hidden" name="user_id" value="<?php echo (int) $user['user_id']; ?>">
+                                        <button type="submit" class="listing-action-btn listing-action-btn-danger confirm-delete">Delete</button>
+                                    </form><?php else: ?><span class="user-subtext">Current account</span><?php endif; ?>
                                 </td>
                             </tr>
                         <?php endwhile; ?>
                     </tbody>
-                </table>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

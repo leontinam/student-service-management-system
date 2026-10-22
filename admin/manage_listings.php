@@ -1,12 +1,15 @@
 <?php
     session_start();
     require '../config/db.php';
+    require_once __DIR__ . '/../config/csrf.php';
 
     if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         header("Location: ../auth/login.php");
         exit();
     }
 
+    // Change a pending listing once and notify its provider only when the update succeeds.
+    // Change a pending listing once and notify its provider only when the update succeeds.
     function updateServiceStatusAndNotify($conn, $service_id, $status) {
         $service_stmt = $conn->prepare("SELECT provider_id, title FROM services WHERE service_id = ? AND status = 'pending'");
         $service_stmt->bind_param("i", $service_id);
@@ -29,29 +32,47 @@
         }
     }
 
-    if (isset($_GET['delete'])) {
-        $service_id = $_GET['delete'];
-        $stmt = $conn->prepare("DELETE FROM services WHERE service_id = ?");
-        $stmt->bind_param("i", $service_id);
-        $stmt->execute();
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['delete', 'approve', 'reject'], true)) {
+        if (!csrf_validate_request()) {
+            csrf_reject_request();
+        }
+        $service_id = filter_input(INPUT_POST, 'service_id', FILTER_VALIDATE_INT);
+
+        if (!$service_id) {
+            header('Location: manage_listings.php');
+            exit();
+        }
+
+        if ($_POST['action'] === 'delete') {
+            // Remove dependent favorites in the same transaction as the service deletion.
+        $conn->begin_transaction();
+
+        try {
+            $favorites_stmt = $conn->prepare("DELETE FROM favorites WHERE service_id = ?");
+            $favorites_stmt->bind_param("i", $service_id);
+            $favorites_stmt->execute();
+
+            $stmt = $conn->prepare("DELETE FROM services WHERE service_id = ?");
+            $stmt->bind_param("i", $service_id);
+            $stmt->execute();
+
+            $conn->commit();
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            throw $exception;
+        }
+
+        header("Location: manage_listings.php");
+        exit();
+        }
+
+        updateServiceStatusAndNotify($conn, $service_id, $_POST['action'] === 'approve' ? 'approved' : 'rejected');
         header("Location: manage_listings.php");
         exit();
     }
 
-    if (isset($_GET['approve'])) {
-        $service_id = $_GET['approve'];
-        updateServiceStatusAndNotify($conn, $service_id, 'approved');
-        header("Location: manage_listings.php");
-        exit();
-    }
-
-    if (isset($_GET['reject'])) {
-        $service_id = $_GET['reject'];
-        updateServiceStatusAndNotify($conn, $service_id, 'rejected');
-        header("Location: manage_listings.php");
-        exit();
-    }
-
+    // Aggregate review scores while listing services for administrative moderation.
+    // Aggregate review scores while listing services for administrative moderation.
     $sql = "SELECT services.service_id, services.title, services.description, services.availability_status, services.status,
                    categories.category_name, users.full_name, users.phone_number, COALESCE(AVG(reviews.rating), 0) AS average_rating,
                    COUNT(reviews.review_id) AS rating_count
@@ -94,7 +115,7 @@
         <a href="manage_categories.php">Manage Categories</a>
         <a href="notifications.php">Notifications</a>
         <div class="logout-link">
-            <a href="../auth/logout.php">Logout</a>
+            <form action="../auth/logout.php" method="post" class="logout-form"><?php echo csrf_field(); ?><button type="submit" class="logout-form-button">Logout</button></form>
         </div>
     </div>
 
@@ -151,10 +172,10 @@
                             </div>
                             <div class="listing-actions">
                                 <?php if ($service['status'] === 'pending'): ?>
-                                    <a href="manage_listings.php?approve=<?php echo $service['service_id']; ?>" class="listing-action-btn">Approve</a>
-                                    <a href="manage_listings.php?reject=<?php echo $service['service_id']; ?>" class="listing-action-btn">Reject</a>
+                                    <form method="post" class="d-inline"><?php echo csrf_field(); ?><input type="hidden" name="service_id" value="<?php echo (int) $service['service_id']; ?>"><button class="listing-action-btn" type="submit" name="action" value="approve">Approve</button></form>
+                                    <form method="post" class="d-inline"><?php echo csrf_field(); ?><input type="hidden" name="service_id" value="<?php echo (int) $service['service_id']; ?>"><button class="listing-action-btn" type="submit" name="action" value="reject">Reject</button></form>
                                 <?php endif; ?>
-                                <a href="manage_listings.php?delete=<?php echo $service['service_id']; ?>" class="listing-action-btn listing-action-btn-danger confirm-delete">Delete</a>
+                                <form method="post" class="d-inline confirm-delete-form"><?php echo csrf_field(); ?><input type="hidden" name="service_id" value="<?php echo (int) $service['service_id']; ?>"><button class="listing-action-btn listing-action-btn-danger confirm-delete" type="submit" name="action" value="delete">Delete</button></form>
                             </div>
                         </article>
                     <?php endwhile; ?>

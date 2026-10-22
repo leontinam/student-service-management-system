@@ -8,6 +8,8 @@
 
     require '../config/db.php';
 
+    // Summary counts and rating aggregates feed the administrator's dashboard cards and charts.
+    // Summary counts and rating aggregates feed the administrator's dashboard cards and charts.
     $total_users = $conn->query("SELECT COUNT(*) as count FROM users")->fetch_assoc()['count'];
     $total_services = $conn->query("SELECT COUNT(*) as count FROM services")->fetch_assoc()['count'];
     $total_categories = $conn->query("SELECT COUNT(*) as count FROM categories")->fetch_assoc()['count'];
@@ -53,7 +55,7 @@
         <a href="manage_categories.php">Manage Categories</a>
         <a href="notifications.php">Notifications</a>
         <div class="logout-link">
-            <a href="../auth/logout.php">Logout</a>
+            <form action="../auth/logout.php" method="post" class="logout-form"><?php echo csrf_field(); ?><button type="submit" class="logout-form-button">Logout</button></form>
         </div>
     </div>
 

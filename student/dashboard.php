@@ -7,6 +7,7 @@
     }
 
     require '../config/db.php';
+    // Count unread notices so the dashboard navigation can show the current badge.
     $notif_count_stmt = $conn->prepare("SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE");
     $notif_count_stmt->bind_param("i", $_SESSION['user_id']);
     $notif_count_stmt->execute();
@@ -38,7 +39,7 @@
         <a href="favorites.php">My Favorites</a>
         <a href="notifications.php">Notifications <?php if ($notif_count > 0): ?><span class="badge bg-danger"><?php echo $notif_count; ?></span><?php endif; ?></a>
         <div class="logout-link">
-            <a href="../auth/logout.php">Logout</a>
+            <form action="../auth/logout.php" method="post" class="logout-form"><?php echo csrf_field(); ?><button type="submit" class="logout-form-button">Logout</button></form>
         </div>
     </div>
 

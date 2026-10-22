@@ -9,11 +9,8 @@
 
     $user_id = $_SESSION['user_id'];
 
-    $mark_read = $conn->prepare("UPDATE notifications SET is_read = TRUE WHERE user_id = ?");
-    $mark_read->bind_param("i", $user_id);
-    $mark_read->execute();
-
-    $stmt = $conn->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC");
+    // Restrict the notification list to the signed-in student and show newest first.
+    $stmt = $conn->prepare("SELECT notification_id, message, created_at, is_read FROM notifications WHERE user_id = ? ORDER BY created_at DESC");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -44,7 +41,7 @@
         <a href="favorites.php">My Favorites</a>
         <a href="notifications.php" class="active">Notifications</a>
         <div class="logout-link">
-            <a href="../auth/logout.php">Logout</a>
+            <form action="../auth/logout.php" method="post" class="logout-form"><?php echo csrf_field(); ?><button type="submit" class="logout-form-button">Logout</button></form>
         </div>
     </div>
 
@@ -68,7 +65,7 @@
             <?php else: ?>
                 <div class="notification-list">
                     <?php while ($notif = $result->fetch_assoc()): ?>
-                    <article class="notification-item">
+                    <article class="notification-item <?php echo $notif['is_read'] ? 'notification-read' : 'notification-unread'; ?>" data-notification-id="<?php echo (int) $notif['notification_id']; ?>" role="button" tabindex="0" aria-label="<?php echo $notif['is_read'] ? 'Read notification' : 'Mark notification as read'; ?>">
                         <span class="notification-dot" aria-hidden="true"></span>
                         <div>
                             <p class="notification-message"><?php echo htmlspecialchars($notif['message']); ?></p>

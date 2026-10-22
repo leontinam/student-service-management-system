@@ -10,9 +10,10 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Return the unread count for the current account to refresh navigation badges.
 $stmt = $conn->prepare('SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND is_read = FALSE');
 $stmt->bind_param('i', $_SESSION['user_id']);
 $stmt->execute();
 $notificationCount = (int) $stmt->get_result()->fetch_assoc()['count'];
 
-echo json_encode(['count' => $notificationCount]);
+echo json_encode(['count' => $notificationCount, 'csrf_token' => csrf_token()]);
